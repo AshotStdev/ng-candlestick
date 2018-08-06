@@ -458,7 +458,7 @@ export class CandlestickComponent implements OnInit {
      this.svg.select('g.trendlines').datum(this.trendlineData).call(this.trendLine.bind(this)).call(this.trendLine.drag.bind(this));
      this.svg.select('g.supstances').datum(this.supstanceData).call(this.supstance.bind(this)).call(this.supstance.drag.bind(this));
 
-     this.svg.select('g.tradearrow').datum(this.trades).call(this.tradeArrow.bind(this));
+     // this.svg.select('g.tradearrow').datum(this.trades).call(this.tradeArrow.bind(this));
 
      // Stash for zooming
      this.zoomableInit = this.x.zoomable().domain([this.indicatorPreRoll, data.length]).copy();
