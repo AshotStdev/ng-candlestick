@@ -67,14 +67,13 @@ export class CandlestickComponent implements OnInit {
   private svg;
   private defs;
   private accessor;
-  private indicatorPreRoll = 0;
+  private indicatorPreRoll = 100;
   private trendlineData;
   private supstanceData;
   private trades;
   private macdData;
   private rsiData;
   private transform;
-
 
   constructor() {
   }
@@ -100,7 +99,7 @@ export class CandlestickComponent implements OnInit {
       height: this.dim.height - this.dim.margin.top - this.dim.margin.bottom
     };
 
-    this.dim.indicator.top = this.dim.ohlc.height + this.dim.indicator.padding;
+    this.dim.indicator.top = this.dim.ohlc.height - this.dim.indicator.height + this.dim.indicator.padding;
     this.dim.indicator.bottom = this.dim.indicator.top + this.dim.indicator.height + this.dim.indicator.padding;
   }
 
@@ -114,14 +113,14 @@ export class CandlestickComponent implements OnInit {
 
   initAxises() {
     this.zoom = d3.zoom()
-      .scaleExtent([0.8, 2])
-      .translateExtent([[0, 0], [this.dim.plot.width + 50, this.dim.plot.height + 50]])
+      // .scaleExtent([0.8, 3])
+      .translateExtent([[-3 * this.dim.plot.width, -0.1 * this.dim.plot.height], [2 * this.dim.plot.width, 1.4 * this.dim.plot.height]])
       .on('zoom', this.zoomed.bind(this));
 
     this.indicatorTop = d3.scaleLinear()
       .range([this.dim.indicator.top, this.dim.indicator.bottom]);
 
-    this.x = techan.scale.financetime()
+    this.x = techan.scale.financetime.utc()
       .range([0, this.dim.plot.width]);
 
     this.y = d3.scaleLinear()
@@ -166,7 +165,7 @@ export class CandlestickComponent implements OnInit {
       .orient('bottom')
       .format( d3TimeFormat.timeFormat('%Y-%m-%d'))
       .width(65)
-      .translate([0, this.dim.plot.height]);
+      .translate([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)]);
 
     this.yAxis = d3.axisRight(this.y);
 
@@ -252,7 +251,7 @@ export class CandlestickComponent implements OnInit {
       .yScale(this.ohlcAnnotation.axis().scale())
       .xAnnotation(this.timeAnnotation)
       .yAnnotation([this.ohlcAnnotation, this.percentAnnotation, this.volumeAnnotation])
-      .verticalWireRange([0, this.dim.plot.height]);
+      .verticalWireRange([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)]);
 
     this.macdCrosshair = techan.plot.crosshair()
       .xScale(this.timeAnnotation.axis().scale())
@@ -307,8 +306,10 @@ export class CandlestickComponent implements OnInit {
     this.svg.append('g')
       .attr('overflow', 'visible')
       .attr('class', 'x axis')
-      .attr('transform', 'translate(0,' + this.dim.plot.height + ')');
+      .attr('transform', 'translate(0,' + (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding) + ')');
 
+    // this.svg.select('.axisannotation.x')
+    //   .attr('transform', 'translate(0,' + (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding) + ')');
     this.ohlcSelection = this.svg.append('g')
       .attr('class', 'ohlc')
       .attr('transform', 'translate(0,0)');
@@ -380,7 +381,6 @@ export class CandlestickComponent implements OnInit {
   private zoomed() {
       this.x.zoomable().domain(d3.event.transform.rescaleX(this.zoomableInit).domain());
       this.y.domain(d3.event.transform.rescaleY(this.yInit).domain());
-      // this.candlestick.yScale(d3.event.transform.rescaleY(this.y));
       this.yPercent.domain(d3.event.transform.rescaleY(this.yPercentInit).domain());
       this.draw();
   }
@@ -424,20 +424,17 @@ export class CandlestickComponent implements OnInit {
      };
    }).sort((a, b) => d3.ascending(this.accessor.d(a), this.accessor.d(b)));
 
-    this.x.domain(techan.scale.plot.time(data).domain());
-    this.y.domain(techan.scale.plot.ohlc(data.slice(this.indicatorPreRoll)).domain());
-    this.yPercent.domain(techan.scale.plot.percent(this.y, this.accessor(data[this.indicatorPreRoll])).domain());
-    this.yVolume.domain(techan.scale.plot.volume(data).domain());
+   this.domainData(data);
 
-    this.trendlineData = [
-      {start: {date: new Date(2018, 10, 1), value: 72.50}, end: {date: new Date(2018, 10, 24), value: 63.34}},
-      {start: {date: new Date(2018, 10, 1), value: 43}, end: {date: new Date(2018, 10, 24), value: 70.50}}
-    ];
-
-    this.supstanceData = [
-      {start: new Date(2018, 10, 1), end: new Date(2018, 10, 24), value: 63.64},
-      {start: new Date(2018, 10, 1), end: new Date(2018, 10, 24), value: 55.50}
-    ];
+    // this.trendlineData = [
+    //   {start: {date: new Date(2018, 10, 1), value: 72.50}, end: {date: new Date(2018, 10, 24), value: 63.34}},
+    //   {start: {date: new Date(2018, 10, 1), value: 43}, end: {date: new Date(2018, 10, 24), value: 70.50}}
+    // ];
+    //
+    // this.supstanceData = [
+    //   {start: new Date(2018, 10, 1), end: new Date(2018, 10, 24), value: 63.64},
+    //   {start: new Date(2018, 10, 1), end: new Date(2018, 10, 24), value: 55.50}
+    // ];
 
     // this.trades = [
     //   {date: data[0].date, type: 'buy', price: data[0].low, low: data[0].low, high: data[0].high},
@@ -446,13 +443,101 @@ export class CandlestickComponent implements OnInit {
     //   {date: data[15].date, type: 'sell', price: data[15].low, low: data[15].low, high: data[15].high}
     // ];
 
-    this.macdData = techan.indicator.macd()(data);
+    this.appendDataToSvg(data);
+
+    this.slashZoom(data);
+
+    this.draw();
+  }
+
+  private domainData(data: any) {
+    const macData = [
+      {
+        date: new Date(2018, 10, 1),
+        macd: 0.11,
+        signal: 0.27,
+        difference: -0.16,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 2),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 3),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 4),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 5),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 6),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 7),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 8),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 9),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      },
+      {
+        date: new Date(2018, 10, 10),
+        macd: -0.12,
+        signal: -0.09,
+        difference: -0.02,
+        zero: 0
+      }
+    ];
+    this.x.domain(techan.scale.plot.time(data).domain());
+    this.y.domain(techan.scale.plot.ohlc(data.slice(this.indicatorPreRoll)).domain());
+    this.yPercent.domain(techan.scale.plot.percent(this.y, this.accessor(data[this.indicatorPreRoll])).domain());
+    this.yVolume.domain(techan.scale.plot.volume(data).domain());
+
+    this.macdData = techan.indicator.macd()(macData);
     this.macdScale.domain(techan.scale.plot.macd(this.macdData).domain());
     this.rsiData = techan.indicator.rsi()(data);
     this.rsiScale.domain(techan.scale.plot.rsi(this.rsiData).domain());
+    console.log(techan.indicator);
     console.log(this.rsiData);
     console.log(this.macdData);
+  }
 
+  private appendDataToSvg(data: any) {
     this.svg.select('g.candlestick').datum(data).call(this.candlestick);
     this.svg.select('g.close.annotation').datum([data[data.length - 1]]).call(this.closeAnnotation);
     this.svg.select('g.volume').datum(data).call(this.volume);
@@ -467,14 +552,11 @@ export class CandlestickComponent implements OnInit {
     this.svg.select('g.crosshair.rsi').call(this.rsiCrosshair).call(this.zoom);
     // this.svg.select('g.trendlines').datum(this.trendlineData).call(this.trendLine).call(this.trendLine.drag);
     this.svg.select('g.supstances').datum(this.supstanceData).call(this.supstance).call(this.supstance.drag);
+  }
 
-    // Stash for zooming
+  private slashZoom(data: any) {
     this.zoomableInit = this.x.zoomable().domain([this.indicatorPreRoll, data.length]).copy();
     this.yInit = this.y.copy();
     this.yPercentInit = this.yPercent.copy();
-
-    this.draw();
   }
-
-
 }
