@@ -4,6 +4,9 @@ import {Component, Input, OnInit} from '@angular/core';
 import * as d3TimeFormat from 'd3-time-format';
 import * as d3Axis from 'd3-axis';
 import * as d3Scale from 'd3-scale';
+import * as d3Selection from 'd3-selection';
+import {bisect} from 'd3';
+
 declare const d3;
 declare const techan;
 
@@ -18,6 +21,7 @@ export class CandlestickComponent implements OnInit {
   @Input() width: number;
   @Input() dateFormat: string;
   @Input() data;
+  private candlestickData;
   private dim;
   private parseDate;
   private indicatorTop;
@@ -74,8 +78,11 @@ export class CandlestickComponent implements OnInit {
   private macdData;
   private rsiData;
   private transform;
+  private candleValues;
+  private bisect;
 
   constructor() {
+    this.bisect = d3.bisector((d) => d.date).left;
   }
 
   ngOnInit() {
@@ -84,6 +91,16 @@ export class CandlestickComponent implements OnInit {
     this.initAxises();
     this.initChart();
     this.initData();
+    window.onresize = () => {
+      this.width = screen.width - 10;
+      this.height = screen.height - 10;
+      this.dim.indicator.height = screen.height / 12 - 5;
+      this.initChartSize();
+      this.setDateFormat();
+      this.initAxises();
+      this.initChart();
+      this.initData();
+    };
   }
 
   initChartSize() {
@@ -114,7 +131,7 @@ export class CandlestickComponent implements OnInit {
   initAxises() {
     this.zoom = d3.zoom()
       // .scaleExtent([0.8, 3])
-      .translateExtent([[-3 * this.dim.plot.width, -0.1 * this.dim.plot.height], [2 * this.dim.plot.width, 1.4 * this.dim.plot.height]])
+      .translateExtent([[-4 * this.dim.plot.width, -0.1 * this.dim.plot.height], [2 * this.dim.plot.width, 1.4 * this.dim.plot.height]])
       .on('zoom', this.zoomed.bind(this));
 
     this.indicatorTop = d3.scaleLinear()
@@ -250,8 +267,11 @@ export class CandlestickComponent implements OnInit {
       .xScale(this.timeAnnotation.axis().scale())
       .yScale(this.ohlcAnnotation.axis().scale())
       .xAnnotation(this.timeAnnotation)
-      .yAnnotation([this.ohlcAnnotation, this.percentAnnotation, this.volumeAnnotation])
-      .verticalWireRange([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)]);
+      .yAnnotation([this.ohlcAnnotation, this.percentAnnotation, this.volumeAnnotation, this.closeAnnotation])
+      .verticalWireRange([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)])
+      .on('enter', this.enter.bind(this))
+      .on('out', this.out.bind(this))
+      .on('move', this.move.bind(this));
 
     this.macdCrosshair = techan.plot.crosshair()
       .xScale(this.timeAnnotation.axis().scale())
@@ -273,15 +293,25 @@ export class CandlestickComponent implements OnInit {
       .attr('height', this.dim.height);
 
     this.defs = this.svg.append('defs');
+
+    this.createCandleStickValuesG();
   }
 
+  createCandleStickValuesG() {
+    this.candleValues = this.svg.append('text')
+      .style('text-anchor', 'end')
+      .attr('class', 'coords')
+      .attr('stroke-opacity', 1)
+      .attr('x', this.dim.plot.width - 30)
+      .attr('y', 15);
+  }
 
   initChart() {
     this.defs.append('clipPath')
       .attr('id', 'ohlcClip')
       .append('rect')
       .attr('x', 0)
-      .attr('y', 0)
+      .attr('y', 20)
       .attr('width', this.dim.plot.width)
       .attr('height', this.dim.ohlc.height);
 
@@ -319,7 +349,7 @@ export class CandlestickComponent implements OnInit {
       .attr('transform', 'translate(' + this.x(1) + ',0)')
       .append('text')
       .attr('transform', 'rotate(-90)')
-      .attr('y', 0)
+      .attr('y', -10)
       .attr('dy', '.0em')
       .style('text-anchor', 'end')
       .text('Price ($)');
@@ -332,8 +362,12 @@ export class CandlestickComponent implements OnInit {
       .attr('clip-path', 'url(#ohlcClip)');
 
     this.ohlcSelection.append('g')
+      .datum(this.data)
       .attr('class', 'candlestick')
-      .attr('clip-path', 'url(#ohlcClip)');
+      .attr('overflow', 'hidden')
+      .attr('clip-path', 'url(#ohlcClip)').on('mouseenter', this.enter.bind(this))
+      .on('mouseout', this.out.bind(this))
+      .on('mousemove', this.move.bind(this));
 
     this.ohlcSelection.append('g')
       .attr('class', 'indicator sma ma-0')
@@ -413,7 +447,8 @@ export class CandlestickComponent implements OnInit {
 
   initData() {
     this.accessor = this.candlestick.accessor();
-   const data = this.data.map((d) => {
+
+   this.candlestickData = this.data.map((d) => {
      return {
        date: d.time_period_start,
        open: d.price_open,
@@ -424,7 +459,7 @@ export class CandlestickComponent implements OnInit {
      };
    }).sort((a, b) => d3.ascending(this.accessor.d(a), this.accessor.d(b)));
 
-   this.domainData(data);
+   this.domainData(this.candlestickData);
 
     // this.trendlineData = [
     //   {start: {date: new Date(2018, 10, 1), value: 72.50}, end: {date: new Date(2018, 10, 24), value: 63.34}},
@@ -443,92 +478,20 @@ export class CandlestickComponent implements OnInit {
     //   {date: data[15].date, type: 'sell', price: data[15].low, low: data[15].low, high: data[15].high}
     // ];
 
-    this.appendDataToSvg(data);
+    this.appendDataToSvg(this.candlestickData);
 
-    this.slashZoom(data);
+    this.slashZoom(this.candlestickData);
 
     this.draw();
   }
 
   private domainData(data: any) {
-    const macData = [
-      {
-        date: new Date(2018, 10, 1),
-        macd: 0.11,
-        signal: 0.27,
-        difference: -0.16,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 2),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 3),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 4),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 5),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 6),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 7),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 8),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 9),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      },
-      {
-        date: new Date(2018, 10, 10),
-        macd: -0.12,
-        signal: -0.09,
-        difference: -0.02,
-        zero: 0
-      }
-    ];
     this.x.domain(techan.scale.plot.time(data).domain());
     this.y.domain(techan.scale.plot.ohlc(data.slice(this.indicatorPreRoll)).domain());
     this.yPercent.domain(techan.scale.plot.percent(this.y, this.accessor(data[this.indicatorPreRoll])).domain());
     this.yVolume.domain(techan.scale.plot.volume(data).domain());
 
-    this.macdData = techan.indicator.macd()(macData);
+    this.macdData = techan.indicator.macd()(data);
     this.macdScale.domain(techan.scale.plot.macd(this.macdData).domain());
     this.rsiData = techan.indicator.rsi()(data);
     this.rsiScale.domain(techan.scale.plot.rsi(this.rsiData).domain());
@@ -559,4 +522,23 @@ export class CandlestickComponent implements OnInit {
     this.yInit = this.y.copy();
     this.yPercentInit = this.yPercent.copy();
   }
+
+  enter() {
+    this.candleValues.style('display', 'inline');
+  }
+
+  out() {
+    this.candleValues.style('display', 'none');
+  }
+
+  move(coords) {
+    const i = this.bisect(this.candlestickData, coords.x),
+      d0 = this.candlestickData[i - 1],
+      d1 = this.candlestickData[i],
+      d = coords.x - d0.date > d1.date - coords.x ? d1 : d0;
+    this.candleValues.text(
+      'Close ' + d.close + ' Open ' + d.open + ' High ' + d.high + ' Low ' + d.low
+    );
+  }
+
 }
