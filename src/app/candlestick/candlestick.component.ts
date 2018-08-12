@@ -1,31 +1,40 @@
-import {Component, Input, OnInit} from '@angular/core';
-// import * as techan from 'techan';
-// import * as d3 from 'd3';
+import {AfterViewInit, Component, Input} from '@angular/core';
+import * as techan from 'techan';
 import * as d3TimeFormat from 'd3-time-format';
-import * as d3Axis from 'd3-axis';
-import * as d3Scale from 'd3-scale';
-import * as d3Selection from 'd3-selection';
-import {bisect} from 'd3';
-
 declare const d3;
-declare const techan;
 
 @Component({
   selector: 'app-candlestick',
-  templateUrl: './candlestick.component.html',
-  styleUrls: ['./candlestick.component.css']
+  templateUrl: './candlestick.component.html'
 })
-export class CandlestickComponent implements OnInit {
+export class CandlestickComponent implements AfterViewInit {
   @Input() chartMargin = {top: 20, right: 50, bottom: 30, left: 50};
   @Input() height: number;
   @Input() width: number;
   @Input() dateFormat: string;
   @Input() data;
+  @Input() lineData = [];
+  parentElement;
+  // data
   private candlestickData;
+  private trendlineData;
+  private supstanceData;
+  private macdData;
+  private rsiData;
+  // svg components
+  private svg;
+  private parentG;
+  private defs;
+  private accessor;
+  private indicatorPreRoll = 12;
+  private trades;
+  private valuesG;
   private dim;
   private parseDate;
   private indicatorTop;
   private zoom;
+  private supstance;
+  // axises
   private x;
   private y;
   private yPercent;
@@ -33,74 +42,66 @@ export class CandlestickComponent implements OnInit {
   private yPercentInit;
   private zoomableInit;
   private yVolume;
+  private xAxis;
+  private yAxis;
+  private volumeAxis;
+  private macdAxis;
+  private rsiAxis;
+  private rsiAxisLeft;
+  private macdAxisLeft;
+  private percentAxis;
+  // candlestick
   private candlestick;
-  // private tradeArrow;
+  /*private tradeArrow;*/
+  // accessors
   private sma0;
   private sma1;
   private ema2;
   private volume;
   private trendLine;
-  private supstance;
-  private xAxis;
+  private macd;
+  private rsi;
+  private line;
+  private lineG;
+  // annotations
   private timeAnnotation;
-  private yAxis;
   private ohlcAnnotation;
   private closeAnnotation;
-  private percentAxis;
   private percentAnnotation;
-  private volumeAxis;
   private volumeAnnotation;
+  private macdAnnotation;
+  private macdAnnotationLeft;
+  private rsiAnnotation;
+  private rsiAnnotationLeft;
+  // scales
   private macdScale;
   private rsiScale;
-  private macd;
-  private macdAxis;
-  private macdAnnotation;
-  private macdAxisLeft;
-  private macdAnnotationLeft;
-  private rsi;
-  private rsiAxis;
-  private rsiAnnotation;
-  private rsiAxisLeft;
-  private rsiAnnotationLeft;
+  // crosshairs
   private ohlcCrosshair;
   private macdCrosshair;
   private rsiCrosshair;
+  // selections
   private ohlcSelection;
   private indicatorSelection;
-
-  private svg;
-  private defs;
-  private accessor;
-  private indicatorPreRoll = 100;
-  private trendlineData;
-  private supstanceData;
-  private trades;
-  private macdData;
-  private rsiData;
-  private transform;
-  private candleValues;
+  // candle values texts
+  private candleValueOpen;
+  private candleValueClose;
+  private candleValueHigh;
+  private candleValueLow;
+  // array bisector
   private bisect;
 
   constructor() {
-    this.bisect = d3.bisector((d) => d.date).left;
   }
 
-  ngOnInit() {
+  ngAfterViewInit() {
     this.initChartSize();
+    this.initSvg();
     this.setDateFormat();
-    this.initAxises();
-    this.initChart();
+    this.initChartComponents();
+    this.createChart();
     this.initData();
-    window.onresize = () => {
-      this.width = screen.width - 10;
-      this.height = screen.height - 10;
-      this.dim.indicator.height = screen.height / 12 - 5;
-      this.initChartSize();
-      this.setDateFormat();
-      this.initAxises();
-      this.initChart();
-      this.initData();
-    };
+    this.responsivefy();
   }
 
   initChartSize() {
@@ -108,57 +109,37 @@ export class CandlestickComponent implements OnInit {
       width: this.width, height: this.height,
       margin: {top: 20, right: 50, bottom: 30, left: 50},
       ohlc: {height: this.height - 195},
-      indicator: {height: 65, padding: 5, top: null, bottom: null},
-      plot: null
+      indicator: {height: null, padding: 5, top: null, bottom: null},
+      plot: null,
+      values: {close: 80, open: 20, high: 40, low: 60}
     };
     this.dim.plot = {
       width: this.dim.width - this.dim.margin.left - this.dim.margin.right,
       height: this.dim.height - this.dim.margin.top - this.dim.margin.bottom
     };
-
+    this.dim.indicator.height = this.dim.ohlc.height / 4;
     this.dim.indicator.top = this.dim.ohlc.height - this.dim.indicator.height + this.dim.indicator.padding;
     this.dim.indicator.bottom = this.dim.indicator.top + this.dim.indicator.height + this.dim.indicator.padding;
   }
 
-  setDateFormat() {
-    if (typeof this.dateFormat === 'undefined') {
-      this.parseDate = d3.timeParse('%d-%b-%y');
-    } else {
-      this.parseDate = d3.timeParse(this.dateFormat);
-    }
+  initChartComponents() {
+    this.initZoom();
+
+    this.createScales();
+
+    this.createAxises();
+
+    this.createStrategies();
+
+    this.createChartComponents();
+
+    this.createAnnotations();
+
+    this.createCrossHairs();
   }
 
-  initAxises() {
-    this.zoom = d3.zoom()
-      // .scaleExtent([0.8, 3])
-      .translateExtent([[-4 * this.dim.plot.width, -0.1 * this.dim.plot.height], [2 * this.dim.plot.width, 1.4 * this.dim.plot.height]])
-      .on('zoom', this.zoomed.bind(this));
-
-    this.indicatorTop = d3.scaleLinear()
-      .range([this.dim.indicator.top, this.dim.indicator.bottom]);
-
-    this.x = techan.scale.financetime.utc()
-      .range([0, this.dim.plot.width]);
-
-    this.y = d3.scaleLinear()
-      .range([this.dim.ohlc.height, 0]);
-
-    this.yPercent = this.y.copy();
-
-    this.yVolume = d3.scaleLinear()
-      .range([this.y(0), this.y(0.2)]);
-
+  createChartComponents() {
     this.candlestick = techan.plot.candlestick()
-      .xScale(this.x)
-      .yScale(this.y);
-
-    this.sma0 = techan.plot.sma()
-      .xScale(this.x)
-      .yScale(this.y);
-    this.sma1 = techan.plot.sma()
-      .xScale(this.x)
-      .yScale(this.y);
-    this.ema2 = techan.plot.ema()
       .xScale(this.x)
       .yScale(this.y);
 
@@ -175,16 +156,135 @@ export class CandlestickComponent implements OnInit {
       .xScale(this.x)
       .yScale(this.y);
 
+    this.macd = techan.plot.macd()
+      .xScale(this.x)
+      .yScale(this.macdScale);
+
+    this.rsi = techan.plot.rsi()
+      .xScale(this.x)
+      .yScale(this.rsiScale);
+
+    this.defs = this.svg.append('defs');
+
+    this.line = d3.line()
+      .x((d) => this.x(d.date))
+      .y((d) => this.y(d.value));
+  }
+
+  setDateFormat() {
+    if (typeof this.dateFormat === 'undefined') {
+      this.parseDate = d3.timeParse('%d-%b-%y');
+    } else {
+      this.parseDate = d3.timeParse(this.dateFormat);
+    }
+  }
+
+  createScales() {
+    this.x = techan.scale.financetime.utc()
+      .range([0, this.dim.plot.width]);
+
+    this.y = d3.scaleLinear()
+      .range([this.dim.ohlc.height, 0]);
+
+    this.yPercent = this.y.copy();
+
+    this.yVolume = d3.scaleLinear()
+      .range([this.y(0), this.y(0.2)]);
+
+    this.indicatorTop = d3.scaleLinear()
+      .range([this.dim.indicator.top, this.dim.indicator.bottom]);
+
+    this.macdScale = d3.scaleLinear()
+      .range([this.indicatorTop(0) + this.dim.indicator.height, this.indicatorTop(0)]);
+
+    this.rsiScale = this.macdScale.copy()
+      .range([this.indicatorTop(1) + this.dim.indicator.height, this.indicatorTop(1)]);
+  }
+
+  createAxises() {
     this.xAxis = d3.axisBottom(this.x);
 
+    this.yAxis = d3.axisRight(this.y);
+
+    this.percentAxis = d3.axisLeft(this.yPercent)
+      .tickFormat(d3.format('+.1%'));
+
+    this.volumeAxis = d3.axisRight(this.yVolume)
+      .ticks(3)
+      .tickFormat(d3.format(',.3s'));
+
+    this.macdAxis = d3.axisRight(this.macdScale)
+      .ticks(3);
+
+    this.macdAxisLeft = d3.axisLeft(this.macdScale)
+      .ticks(3);
+
+    this.rsiAxis = d3.axisRight(this.rsiScale)
+      .ticks(3);
+
+    this.rsiAxisLeft = d3.axisLeft(this.rsiScale)
+      .ticks(3);
+  }
+
+  initZoom() {
+    this.zoom = d3.zoom()
+      .scaleExtent([0.1, 6])
+      .translateExtent([[-Infinity, -2 * this.dim.plot.height], [2 * this.dim.plot.width, Infinity]])
+      .on('zoom', this.zoomed.bind(this));
+  }
+
+  createStrategies() {
+    this.sma0 = techan.plot.sma()
+      .xScale(this.x)
+      .yScale(this.y);
+    this.sma1 = techan.plot.sma()
+      .xScale(this.x)
+      .yScale(this.y);
+    this.ema2 = techan.plot.ema()
+      .xScale(this.x)
+      .yScale(this.y);
+  }
+
+  initSvg() {
+    this.svg = d3.select('svg')
+      .style('overflow', 'visible')
+      .attr('width', this.dim.width)
+      .attr('height', this.dim.height);
+  }
+
+  createCrossHairs() {
+    this.ohlcCrosshair = techan.plot.crosshair()
+      .xScale(this.timeAnnotation.axis().scale())
+      .yScale(this.ohlcAnnotation.axis().scale())
+      .xAnnotation(this.timeAnnotation)
+      .yAnnotation([this.ohlcAnnotation, this.percentAnnotation, this.volumeAnnotation])
+      .verticalWireRange([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)])
+      .on('enter', this.enter.bind(this))
+      .on('out', this.out.bind(this))
+      .on('move', this.move.bind(this));
+
+    this.macdCrosshair = techan.plot.crosshair()
+      .xScale(this.timeAnnotation.axis().scale())
+      .yScale(this.macdAnnotation.axis().scale())
+      .xAnnotation(this.timeAnnotation)
+      .yAnnotation([this.macdAnnotation, this.macdAnnotationLeft])
+      .verticalWireRange([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)]);
+
+    this.rsiCrosshair = techan.plot.crosshair()
+      .xScale(this.timeAnnotation.axis().scale())
+      .yScale(this.rsiAnnotation.axis().scale())
+      .xAnnotation(this.timeAnnotation)
+      .yAnnotation([this.rsiAnnotation, this.rsiAnnotationLeft])
+      .verticalWireRange([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)]);
+  }
+
+  createAnnotations() {
     this.timeAnnotation = techan.plot.axisannotation()
       .axis(this.xAxis)
       .orient('bottom')
-      .format( d3TimeFormat.timeFormat('%Y-%m-%d'))
+      .format(d3TimeFormat.timeFormat('%Y-%m-%d'))
       .width(65)
       .translate([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)]);
-
-    this.yAxis = d3.axisRight(this.y);
 
     this.ohlcAnnotation = techan.plot.axisannotation()
       .axis(this.yAxis)
@@ -199,34 +299,14 @@ export class CandlestickComponent implements OnInit {
       .format(d3.format(',.2f'))
       .translate([this.x(1), 0]);
 
-    this.percentAxis = d3.axisLeft(this.yPercent)
-      .tickFormat(d3.format('+.1%'));
-
     this.percentAnnotation = techan.plot.axisannotation()
       .axis(this.percentAxis)
       .orient('left');
-
-    this.volumeAxis = d3.axisRight(this.yVolume)
-      .ticks(3)
-      .tickFormat(d3.format(',.3s'));
 
     this.volumeAnnotation = techan.plot.axisannotation()
       .axis(this.volumeAxis)
       .orient('right')
       .width(35);
-
-    this.macdScale = d3.scaleLinear()
-      .range([this.indicatorTop(0) + this.dim.indicator.height, this.indicatorTop(0)]);
-
-    this.rsiScale = this.macdScale.copy()
-      .range([this.indicatorTop(1) + this.dim.indicator.height, this.indicatorTop(1)]);
-
-    this.macd = techan.plot.macd()
-      .xScale(this.x)
-      .yScale(this.macdScale);
-
-    this.macdAxis = d3.axisRight(this.macdScale)
-      .ticks(3);
 
     this.macdAnnotation = techan.plot.axisannotation()
       .axis(this.macdAxis)
@@ -234,84 +314,65 @@ export class CandlestickComponent implements OnInit {
       .format(d3.format(',.2f'))
       .translate([this.x(1), 0]);
 
-    this.macdAxisLeft = d3.axisLeft(this.macdScale)
-      .ticks(3);
-
-    this.macdAnnotationLeft = techan.plot.axisannotation()
-      .axis(this.macdAxisLeft)
-      .orient('left')
-      .format(d3.format(',.2f'));
-
-    this.rsi = techan.plot.rsi()
-      .xScale(this.x)
-      .yScale(this.rsiScale);
-
-    this.rsiAxis = d3.axisRight(this.rsiScale)
-      .ticks(3);
-
     this.rsiAnnotation = techan.plot.axisannotation()
       .axis(this.rsiAxis)
       .orient('right')
       .format(d3.format(',.2f'))
       .translate([this.x(1), 0]);
 
-    this.rsiAxisLeft = d3.axisLeft(this.rsiScale)
-      .ticks(3);
+    this.macdAnnotationLeft = techan.plot.axisannotation()
+      .axis(this.macdAxisLeft)
+      .orient('left')
+      .format(d3.format(',.2f'));
 
     this.rsiAnnotationLeft = techan.plot.axisannotation()
       .axis(this.rsiAxisLeft)
       .orient('left')
       .format(d3.format(',.2f'));
-
-    this.ohlcCrosshair = techan.plot.crosshair()
-      .xScale(this.timeAnnotation.axis().scale())
-      .yScale(this.ohlcAnnotation.axis().scale())
-      .xAnnotation(this.timeAnnotation)
-      .yAnnotation([this.ohlcAnnotation, this.percentAnnotation, this.volumeAnnotation, this.closeAnnotation])
-      .verticalWireRange([0, (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding)])
-      .on('enter', this.enter.bind(this))
-      .on('out', this.out.bind(this))
-      .on('move', this.move.bind(this));
-
-    this.macdCrosshair = techan.plot.crosshair()
-      .xScale(this.timeAnnotation.axis().scale())
-      .yScale(this.macdAnnotation.axis().scale())
-      .xAnnotation(this.timeAnnotation)
-      .yAnnotation([this.macdAnnotation, this.macdAnnotationLeft])
-      .verticalWireRange([0, this.dim.plot.height]);
-
-    this.rsiCrosshair = techan.plot.crosshair()
-      .xScale(this.timeAnnotation.axis().scale())
-      .yScale(this.rsiAnnotation.axis().scale())
-      .xAnnotation(this.timeAnnotation)
-      .yAnnotation([this.rsiAnnotation, this.rsiAnnotationLeft])
-      .verticalWireRange([0, this.dim.plot.height]);
-
-    this.svg = d3.select('svg')
-      .attr('overflow', 'visible')
-      .attr('width', this.dim.width)
-      .attr('height', this.dim.height);
-
-    this.defs = this.svg.append('defs');
-
-    this.createCandleStickValuesG();
   }
 
   createCandleStickValuesG() {
-    this.candleValues = this.svg.append('text')
-      .style('text-anchor', 'end')
-      .attr('class', 'coords')
-      .attr('stroke-opacity', 1)
-      .attr('x', this.dim.plot.width - 30)
-      .attr('y', 15);
+    this.valuesG = this.parentG.append('g')
+      .attr('class', 'values');
+
+    this.bisect = d3.bisector((d) => d.date).left;
+    this.candleValueOpen = this.valuesG.append('text')
+      .style('text-anchor', 'start')
+      .attr('class', 'text-open')
+      .attr('font-size', '1em')
+      .attr('x', 20)
+      .attr('y', this.dim.values.open);
+
+    this.candleValueClose = this.valuesG.append('text')
+      .style('text-anchor', 'start')
+      .attr('class', 'text-close')
+      .attr('font-size', '1em')
+      .attr('x', 20)
+      .attr('y', this.dim.values.close);
+
+    this.candleValueHigh = this.valuesG.append('text')
+      .style('text-anchor', 'start')
+      .attr('class', 'text-high')
+      .attr('font-size', '1em')
+      .attr('x', 20)
+      .attr('y', this.dim.values.high);
+    this.candleValueLow = this.valuesG.append('text')
+      .style('text-anchor', 'start')
+      .attr('class', 'text-low')
+      .attr('font-size', '1em')
+      .attr('x', 20)
+      .attr('y', this.dim.values.low);
   }
 
-  initChart() {
+  createChart() {
+    this.parentG = this.svg.append('g')
+      .attr('transform', 'translate(' + this.dim.margin.left + ',' + this.dim.margin.top + ')');
+
     this.defs.append('clipPath')
       .attr('id', 'ohlcClip')
       .append('rect')
       .attr('x', 0)
-      .attr('y', 20)
+      .attr('y', 0)
       .attr('width', this.dim.plot.width)
       .attr('height', this.dim.ohlc.height);
 
@@ -325,24 +386,24 @@ export class CandlestickComponent implements OnInit {
       .attr('width', this.dim.plot.width)
       .attr('height', this.dim.indicator.height);
 
-    this.svg.append('g')
-      .attr('transform', 'translate(' + this.dim.margin.left + ',' + this.dim.margin.top + ')');
-
-    this.svg.append('text')
+    this.parentG.append('text')
       .attr('class', 'symbol')
       .attr('x', 20)
-      .text('Tailor Traids');
+      .text('Tailored Trades');
 
-    this.svg.append('g')
+    this.parentG.append('g')
       .attr('overflow', 'visible')
       .attr('class', 'x axis')
       .attr('transform', 'translate(0,' + (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding) + ')');
 
-    // this.svg.select('.axisannotation.x')
-    //   .attr('transform', 'translate(0,' + (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding) + ')');
-    this.ohlcSelection = this.svg.append('g')
+    this.svg.select('.axisannotation.x')
+      .attr('transform', 'translate(0,' + (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding) + ')');
+    this.ohlcSelection = this.parentG.append('g')
       .attr('class', 'ohlc')
+      .attr('overflow', 'visible')
       .attr('transform', 'translate(0,0)');
+
+    this.createCandleStickValuesG();
 
     this.ohlcSelection.append('g')
       .attr('class', 'axis')
@@ -362,18 +423,16 @@ export class CandlestickComponent implements OnInit {
       .attr('clip-path', 'url(#ohlcClip)');
 
     this.ohlcSelection.append('g')
-      .datum(this.data)
       .attr('class', 'candlestick')
       .attr('overflow', 'hidden')
-      .attr('clip-path', 'url(#ohlcClip)').on('mouseenter', this.enter.bind(this))
-      .on('mouseout', this.out.bind(this))
-      .on('mousemove', this.move.bind(this));
+      .attr('clip-path', 'url(#ohlcClip)');
 
     this.ohlcSelection.append('g')
       .attr('class', 'indicator sma ma-0')
       .attr('clip-path', 'url(#ohlcClip)');
 
     this.ohlcSelection.append('g')
+      .attr('overflow', 'hidden')
       .attr('class', 'indicator sma ma-1')
       .attr('clip-path', 'url(#ohlcClip)');
 
@@ -387,7 +446,7 @@ export class CandlestickComponent implements OnInit {
     this.ohlcSelection.append('g')
       .attr('class', 'volume axis');
 
-    this.indicatorSelection = this.svg.selectAll('svg > g.indicator').data(['macd', 'rsi']).enter()
+    this.indicatorSelection = this.parentG.selectAll('svg > g.indicator').data(['macd', 'rsi']).enter()
       .append('g')
       .attr('class', (d) => d + ' indicator');
     this.indicatorSelection.append('g')
@@ -402,21 +461,41 @@ export class CandlestickComponent implements OnInit {
       .attr('class', 'indicator-plot')
       .attr('clip-path', (d, i) => 'url(#indicatorClip-' + i + ')');
 
-    this.svg.append('g')
+    this.parentG.append('g')
       .attr('class', 'crosshair ohlc');
 
-    this.svg.append('g')
+    this.parentG.append('g')
       .attr('class', 'crosshair macd');
 
-    this.svg.append('g')
+    this.parentG.append('g')
       .attr('class', 'crosshair rsi');
+
+    // this.lineG = this.svg.append('g')
+    //   .attr('transform',
+    //     'translate(' + this.dim.margin.left + ',' + this.dim.margin.top + ')'
+    //   );
+    //
+    // this.lineG.append('g')
+    //   .attr('transform', 'translate(0,' + (this.dim.indicator.bottom + this.dim.indicator.height + this.dim.indicator.padding) + ')');
+    //
+    // this.lineG.append('path')
+    //   .datum(this.lineData)
+    //   .attr('fill', 'none')
+    //   .attr('stroke', 'steelblue')
+    //   .attr('stroke-linejoin', 'round')
+    //   .attr('stroke-linecap', 'round')
+    //   .attr('stroke-width', 1.5)
+    //   .attr('clip-path', 'url(#ohlcClip)')
+    //   .attr('d', this.line);
   }
 
   private zoomed() {
-      this.x.zoomable().domain(d3.event.transform.rescaleX(this.zoomableInit).domain());
-      this.y.domain(d3.event.transform.rescaleY(this.yInit).domain());
-      this.yPercent.domain(d3.event.transform.rescaleY(this.yPercentInit).domain());
-      this.draw();
+    this.x.zoomable().clamp(true).domain(d3.event.transform.rescaleX(this.zoomableInit).domain());
+    // this.yAxis.scale(d3.event.transform.rescaleY(this.y));
+    // this.candlestick.yScale(d3.event.transform.rescaleY(this.y));
+    // this.y.domain(d3.event.transform.rescaleY(this.yInit).domain());
+    // this.yPercent.domain(d3.event.transform.rescaleY(this.yPercentInit).domain());
+    this.draw();
   }
 
   private draw() {
@@ -447,19 +526,18 @@ export class CandlestickComponent implements OnInit {
 
   initData() {
     this.accessor = this.candlestick.accessor();
+    this.candlestickData = this.data.map((d) => {
+      return {
+        date: d.time_period_start,
+        open: d.price_open,
+        high: d.price_high,
+        low: d.price_low,
+        close: d.price_close,
+        volume: +d.volume_traded
+      };
+    }).sort((a, b) => d3.ascending(this.accessor.d(a), this.accessor.d(b)));
 
-   this.candlestickData = this.data.map((d) => {
-     return {
-       date: d.time_period_start,
-       open: d.price_open,
-       high: d.price_high,
-       low: d.price_low,
-       close: d.price_close,
-       volume: +d.volume_traded
-     };
-   }).sort((a, b) => d3.ascending(this.accessor.d(a), this.accessor.d(b)));
-
-   this.domainData(this.candlestickData);
+    this.domainData(this.candlestickData);
 
     // this.trendlineData = [
     //   {start: {date: new Date(2018, 10, 1), value: 72.50}, end: {date: new Date(2018, 10, 24), value: 63.34}},
@@ -495,17 +573,14 @@ export class CandlestickComponent implements OnInit {
     this.macdScale.domain(techan.scale.plot.macd(this.macdData).domain());
     this.rsiData = techan.indicator.rsi()(data);
     this.rsiScale.domain(techan.scale.plot.rsi(this.rsiData).domain());
-    console.log(techan.indicator);
-    console.log(this.rsiData);
-    console.log(this.macdData);
   }
 
   private appendDataToSvg(data: any) {
     this.svg.select('g.candlestick').datum(data).call(this.candlestick);
     this.svg.select('g.close.annotation').datum([data[data.length - 1]]).call(this.closeAnnotation);
     this.svg.select('g.volume').datum(data).call(this.volume);
-    this.svg.select('g.sma.ma-0').datum(techan.indicator.sma().period(2)(data)).call(this.sma0);
-    this.svg.select('g.sma.ma-1').datum(techan.indicator.sma().period(3)(data)).call(this.sma1);
+    this.svg.select('g.sma.ma-0').datum(techan.indicator.sma().period(5)(data)).call(this.sma0);
+    this.svg.select('g.sma.ma-1').datum(techan.indicator.sma().period(14)(data)).call(this.sma1);
     this.svg.select('g.ema.ma-2').datum(techan.indicator.ema().period(4)(data)).call(this.ema2);
     this.svg.select('g.macd .indicator-plot').datum(this.macdData).call(this.macd);
     this.svg.select('g.rsi .indicator-plot').datum(this.rsiData).call(this.rsi);
@@ -524,11 +599,17 @@ export class CandlestickComponent implements OnInit {
   }
 
   enter() {
-    this.candleValues.style('display', 'inline');
+    this.candleValueLow.style('display', 'inline');
+    this.candleValueHigh.style('display', 'inline');
+    this.candleValueClose.style('display', 'inline');
+    this.candleValueOpen.style('display', 'inline');
   }
 
   out() {
-    this.candleValues.style('display', 'none');
+    this.candleValueLow.style('display', 'none');
+    this.candleValueHigh.style('display', 'none');
+    this.candleValueClose.style('display', 'none');
+    this.candleValueOpen.style('display', 'none');
   }
 
   move(coords) {
@@ -536,9 +617,54 @@ export class CandlestickComponent implements OnInit {
       d0 = this.candlestickData[i - 1],
       d1 = this.candlestickData[i],
       d = coords.x - d0.date > d1.date - coords.x ? d1 : d0;
-    this.candleValues.text(
-      'Close ' + d.close + ' Open ' + d.open + ' High ' + d.high + ' Low ' + d.low
+    this.candleValueClose.text(
+      'Close ' + d.close
     );
+    this.candleValueOpen.text(
+      'Open ' + d.open
+    );
+    this.candleValueHigh.text(
+      'High ' + d.high
+    );
+    this.candleValueLow.text(
+      'Low ' + d.low
+    );
+    if (d.open > d.close) {
+      this.candleValueOpen.style('fill', '#64110d');
+      this.candleValueHigh.style('fill', '#64110d');
+      this.candleValueLow.style('fill', '#64110d');
+      this.candleValueClose.style('fill', '#64110d');
+    } else {
+      this.candleValueOpen.style('fill', '#2f6014');
+      this.candleValueHigh.style('fill', '#2f6014');
+      this.candleValueLow.style('fill', '#2f6014');
+      this.candleValueClose.style('fill', '#2f6014');
+    }
   }
 
+  responsivefy() {
+    // get container + svg aspect ratio
+    this.parentElement = d3.select(this.svg.node().parentNode.parentNode);
+    this.width = parseInt(this.svg.style('width'), 10);
+    this.height = parseInt(this.svg.style('height'), 10);
+
+    // add viewBox and preserveAspectRatio properties,
+    // and call resize so that svg resizes on inital page load
+    this.svg.attr('viewBox', '0 0 ' + this.width + ' ' + this.height)
+      .attr('preserveAspectRatio', 'xMinYMid')
+      .call(this.resize.bind(this));
+
+    // to register multiple listeners for same event type,
+    // you need to add namespace, i.e., 'click.foo'
+    // necessary if you call invoke this function for multiple svgs
+    this.resize();
+    d3.select(window).on('resize.' + this.parentElement.attr('id'), this.resize.bind(this));
+  }
+
+  // get width of container and resize svg to fit it
+  resize() {
+    const targetWidth = parseInt(this.parentElement.style('width'), 10);
+    this.svg.attr('width', targetWidth);
+    this.svg.attr('height', Math.round(targetWidth / (this.width / this.height)));
+  }
 }
