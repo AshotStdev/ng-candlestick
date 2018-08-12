@@ -1,6 +1,7 @@
 {
   "name": "ng-candlestick",
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "author": "Ashot Mkrtchyan STDev",
   "scripts": {
     "ng": "ng",
     "start": "ng serve --open --port 6666",
