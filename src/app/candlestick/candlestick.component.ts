@@ -630,15 +630,15 @@ export class CandlestickComponent implements AfterViewInit {
       'Low ' + d.low
     );
     if (d.open > d.close) {
-      this.candleValueOpen.style('fill', '#64110d');
-      this.candleValueHigh.style('fill', '#64110d');
-      this.candleValueLow.style('fill', '#64110d');
-      this.candleValueClose.style('fill', '#64110d');
+      this.candleValueOpen.style('fill', '#82140d');
+      this.candleValueHigh.style('fill', '#82140d');
+      this.candleValueLow.style('fill', '#82140d');
+      this.candleValueClose.style('fill', '#82140d');
     } else {
-      this.candleValueOpen.style('fill', '#2f6014');
-      this.candleValueHigh.style('fill', '#2f6014');
-      this.candleValueLow.style('fill', '#2f6014');
-      this.candleValueClose.style('fill', '#2f6014');
+      this.candleValueOpen.style('fill', '#306a15');
+      this.candleValueHigh.style('fill', '#306a15');
+      this.candleValueLow.style('fill', '#306a15');
+      this.candleValueClose.style('fill', '#306a15');
     }
   }
 

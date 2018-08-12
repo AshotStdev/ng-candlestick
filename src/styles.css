@@ -1,8 +1,4 @@
 /* You can add global styles to this file, and also import other style files */
-body {
-  font: 10px sans-serif;
-}
-
 text {
   fill: #000;
 }
@@ -13,7 +9,7 @@ text.symbol {
 
 path {
   fill: none;
-  stroke-width: 1;
+  stroke-width: 1px;
 }
 
 path.candle {
@@ -21,7 +17,7 @@ path.candle {
 }
 
 path.candle.body {
-  stroke-width: 1;
+  stroke-width: 0.5px;
 }
 
 .macd {
@@ -29,17 +25,18 @@ path.candle.body {
 }
 
 path.candle.up {
-  fill: #00AA00;
-  stroke: #00AA00;
+  fill: #53b987;
+  stroke: #53b987;
+
 }
 
 path.candle.down {
-  fill: #FF0000;
-  stroke: #FF0000;
+  fill: #eb4d5c;
+  stroke: #eb4d5c;
 }
 
 .close.annotation.up path {
-  fill: #00AA00;
+  fill: #53b987;
 }
 
 path.volume {
@@ -48,7 +45,7 @@ path.volume {
 
 .indicator-plot path.line {
   fill: none;
-  stroke-width: 1;
+  stroke-width: 2px;
 }
 
 .ma-0 path.line {
@@ -61,12 +58,6 @@ path.volume {
 
 .ma-2 path.line {
   stroke: #ff7f0e;
-}
-
-button {
-  position: absolute;
-  right: 110px;
-  top: 25px;
 }
 
 path.macd {
@@ -104,7 +95,7 @@ path.middle, path.zero {
 
 .analysis path, .analysis circle {
   stroke: blue;
-  stroke-width: 0.8;
+  stroke-width: 0.8px;
 }
 
 .trendline circle {
@@ -113,11 +104,11 @@ path.middle, path.zero {
 }
 
 .mouseover .trendline path {
-  stroke-width: 1.2;
+  stroke-width: 1.2px;
 }
 
 .mouseover .trendline circle {
-  stroke-width: 1;
+  stroke-width: 1px;
   display: inline;
 }
 
@@ -147,7 +138,7 @@ path.middle, path.zero {
 }
 
 .mouseover .supstance path {
-  stroke-width: 1.5;
+  stroke-width: 1.5px;
 }
 
 .dragging .supstance path {
@@ -185,7 +176,7 @@ path.middle, path.zero {
 
 .tradearrow path.highlight {
   fill: none;
-  stroke-width: 2;
+  stroke-width: 2px;
 }
 
 .tradearrow path.highlight.buy {
