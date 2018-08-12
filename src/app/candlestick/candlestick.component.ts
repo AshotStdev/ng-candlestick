@@ -389,7 +389,7 @@ export class CandlestickComponent implements AfterViewInit {
     this.parentG.append('text')
       .attr('class', 'symbol')
       .attr('x', 20)
-      .text('Tailored Trades');
+      .text('STDev');
 
     this.parentG.append('g')
       .attr('overflow', 'visible')

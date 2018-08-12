@@ -39,6 +39,11 @@ path.candle.down {
   fill: #53b987;
 }
 
+.close.annotation.up text {
+  fill: #fff;
+  font-size: .7em;
+}
+
 path.volume {
   fill: #DDDDDD;
 }
@@ -76,7 +81,7 @@ path.zero {
 
 path.difference {
   fill: #BBBBBB;
-  opacity: 0.5;
+  /*opacity: 0.5;*/
 }
 
 path.rsi {
@@ -151,15 +156,16 @@ path.middle, path.zero {
 
 .crosshair path.wire {
   stroke: #1D1F20;
-  stroke-dasharray: 6, 2;
+  stroke-dasharray: 6, 3;
 }
 
 .crosshair .axisannotation path {
-  fill: rgba(29, 31, 32, 0.89);
+  fill: rgba(56, 58, 59, 0.89);
 }
 
 .crosshair .axisannotation text {
   fill: #fff;
+  font-size: .7em;
 }
 
 .tradearrow path.tradearrow {
