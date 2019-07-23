@@ -1,5 +1,5 @@
 # NgCandlestick
-![alt text](http://joxi.net/zAN9V0lTBwjpP2)
+![alt text](https://github.com/AshotStdev/ng-candlestick/blob/master/Screenshot%20from%202019-07-23%2012-00-13.png)
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 6.0.7.
 
